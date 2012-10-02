@@ -85,6 +85,8 @@ static uint8_t mp3DataBuffer[32];
 #define SCI_AICTRL3 0x0F
 
 //VS10xx SCI_MODE bitmasks
+// note: avoid writing back a read and mask of SCI_MASK
+// not all bits are stable, specifically SM_SDINEW.
 #define SM_DIFF           0x0001
 #define SM_LAYER12        0x0002
 #define SM_RESET          0x0004
@@ -101,6 +103,9 @@ static uint8_t mp3DataBuffer[32];
 //#define Not Defined     0x2000
 #define SM_LINE1          0x4000
 #define SM_CLK_RANGE      0x8000
+
+// configure Line1 as single ended, otherwise as differential 10x gain for microphones.
+#define VS_LINE1_MODE
 
 #define TRUE  1
 #define FALSE  0
@@ -127,6 +132,8 @@ uint32_t currentPosition();
 void setBitRate(uint16_t);
 void pauseDataStream();
 void resumeDataStream();
+uint8_t ADMixerLoad(char*);
+void ADMixerVol(int8_t);
 
 private:
 void getTrackInfo(uint8_t, char*);

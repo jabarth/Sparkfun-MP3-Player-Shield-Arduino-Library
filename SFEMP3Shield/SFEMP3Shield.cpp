@@ -501,3 +501,47 @@ uint8_t SFEMP3Shield::VSLoadUserCode(char* fileName){
 //	playing=FALSE;
 	return 0;
 }
+
+//Initially load ADMixer patch and configure line/mic mode
+uint8_t SFEMP3Shield::ADMixerLoad(char* fileName){
+  
+	if(playing != FALSE)
+		return 0;
+
+	Serial.println("Appling ADMixer patch.");
+	if (VSLoadUserCode(fileName)) return 2; // Serial.print("Error: "); Serial.print(fileName); Serial.println(", file not found, skipping.");
+
+	// Set Input Mode to either Line1 or Microphone.
+#if defined(VS_LINE1_MODE)
+		Mp3WriteRegister(SCI_MODE, SM_SDINEW | SM_LINE1);
+#else
+		Mp3WriteRegister(SCI_MODE, SM_SDINEW);
+#endif
+	return 0;
+}
+
+//Set ADMixer's attenuation of input to between -3 and -31 dB otherwise disable
+void SFEMP3Shield::ADMixerVol(int8_t ADM_volume){
+	// Note if file patch not applied this call will lock up the VS10xx.
+	// need to add interlock to avoid.
+	union twobyte MP3AIADDR;
+	union twobyte MP3AICTRL0;
+
+	MP3AIADDR.word = Mp3ReadRegister(SCI_AIADDR);
+
+	if ((ADM_volume > -3) || (-31 > ADM_volume)) {
+		// Disable Mixer Patch
+		MP3AIADDR.word = 0x0F01;
+		Mp3WriteRegister(SCI_AIADDR, MP3AIADDR.word);
+	} else {
+	  // Set Volume
+	  //MP3AICTRL0.word = Mp3ReadRegister(SCI_AICTRL0);
+	  MP3AICTRL0.byte[1] = (uint8_t) ADM_volume; // upper byte appears to have no affect
+	  MP3AICTRL0.byte[0] = (uint8_t) ADM_volume;
+	  Mp3WriteRegister(SCI_AICTRL0, MP3AICTRL0.word);
+
+		// Enable Mixer Patch
+		MP3AIADDR.word = 0x0F00;
+		Mp3WriteRegister(SCI_AIADDR, MP3AIADDR.word);
+	}
+}

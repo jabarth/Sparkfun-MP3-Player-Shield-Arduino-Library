@@ -27,6 +27,8 @@ setBitRate	KEYWORD2
 trackTitle	KEYWORD2
 trackArtist	KEYWORD2
 trackAlbum	KEYWORD2
+ADMixerLoad	KEYWORD2
+ADMixerVol 	KEYWORD2
 
 
 #######################################

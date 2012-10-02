@@ -39,6 +39,7 @@ char album[30];
 void setup() {
 
   Serial.begin(115200);
+  Serial.println("Hello");
   
   //boot up the MP3 Player Shield
   result = MP3player.begin();
@@ -48,8 +49,9 @@ void setup() {
     Serial.print(result);
     Serial.println(" when trying to start MP3 player");
     }
+  MP3player.ADMixerLoad("admxster.053");
+  MP3player.ADMixerVol(-3);
 
-  Serial.println("Hello");
   Serial.println("Send a number 1-9 to play a track or s to stop playing");
   
 }

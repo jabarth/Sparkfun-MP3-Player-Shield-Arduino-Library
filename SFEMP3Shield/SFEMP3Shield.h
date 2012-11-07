@@ -125,6 +125,80 @@ extern uint8_t mp3DataBuffer[32];
 #define TRACK_ARTIST 33
 #define TRACK_ALBUM 63
 
+/** Types of audio streams
+ *
+ */
+enum AudioType
+{
+    WAV,                        /*!< WAVE audio stream */
+    AAC,                        /*!< AAC audio stream (ADTS (.aac), MPEG2 ADIF (.aac) and MPEG4 AUDIO (.mp4 / .m4a / .3gp / .3g2)) */
+    WMA,                        /*!< Windows Media Audio (WMA) stream */
+    MIDI,                       /*!< Midi audio stream */   
+    OGG_VORBIS,                 /*!< Ogg Vorbis audio stream */
+    MP3,                        /*!< MPEG Audio Layer */
+    UNKNOWN                     /*!< Unknown */
+};
+ 
+typedef enum AudioType AudioType;
+ 
+/** Types of MPEG Audio Layer stream IDs.
+ *
+ */
+enum MP3_ID
+{
+    MPG2_5a  = 0,               /*!< MPG 2.5, nonstandard, proprietary */
+    MPG2_5b  = 1,               /*!< MPG 2.5, nonstandard, proprietary */
+    MPG2_0   = 2,               /*!< ISO 13818-3 MPG 2.0 */
+    MPG1_0   = 3                /*!< ISO 11172-3 MPG 1.0 */
+};
+ 
+typedef enum MP3_ID MP3_ID;
+ 
+/** Types of MPEG Audio Layer channel modes.
+ *
+ */
+enum MP3_MODE
+{
+    STEREO       = 0,           /*!< Stereo */
+    JOINT_STEREO = 1,           /*!< Joint Stereo */
+    DUAL_CHANNEL = 2,           /*!< Dual Channel */
+    MONO         = 3            /*!< Mono */
+};
+ 
+typedef enum MP3_MODE MP3_MODE;
+/** Struct for informations about audio streams.
+ *
+ */
+typedef struct AudioInfo
+{
+   AudioType            type            : 4;        /*!< Type of the audio stream - important for the interpretation of the lower union */
+   unsigned short       kBitRate;                   /*!< Average bitrate of the audio stream - in kBit/s */
+   unsigned short       decodeTime;                 /*!< Decode time */
+   union {
+        struct {
+            MP3_ID      id              : 2;        /*!< ID */
+            char        layer           : 2;        /*!< Layer */
+            char        protrectBit     : 1;        /*!< Protect bit, see p.44 of the datasheet */
+            char        padBit          : 1;        /*!< Pad bit, see p.44 of the datasheet */
+            MP3_MODE    mode            : 2;        /*!< Channel mode */
+            char        extension       : 2;        /*!< Extension, see p.44 of the datasheet */
+            char        copyright       : 1;        /*!< Copyright, see p.44 of the datasheet */
+            char        original        : 1;        /*!< Original, see p.44 of the datasheet */
+            char        emphasis        : 2;        /*!< Emphasis, see p.44 of the datasheet */
+            char        kSampleRate     : 6;        /*!< Samplerate - in kHz (rounded) */
+        } mp3;                                      /*!< MPEG Audio Layer */
+        struct {
+         
+        } wma;                                      /*!< Windows Media Audio (WMA) stream */
+        struct {
+         
+        } aac;                                      /*!< AAC audio stream */
+        struct {
+         
+        } other;                                    /*!< Other */
+   } ext;
+    
+} AudioInfo;
 
 class SFEMP3Shield {
 public:
@@ -142,8 +216,10 @@ uint32_t currentPosition();
 void setBitRate(uint16_t);
 void pauseDataStream();
 void resumeDataStream();
+AudioInfo AInfo;
 
 private:
+void getAudioInfo();
 void getTrackInfo(uint8_t, char*);
 uint8_t bitrate;
 uint32_t start_of_music;

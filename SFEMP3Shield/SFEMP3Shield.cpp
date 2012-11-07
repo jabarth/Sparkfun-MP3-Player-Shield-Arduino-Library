@@ -6,20 +6,28 @@
 
 //bitrate lookup table      V1,L1  V1,L2   V1,L3   V2,L1  V2,L2+L3
 //168 bytes(!!); better to store in progmem or eeprom
-uint16_t bitrate_table[14][6] PROGMEM = { {0,0,0,0,0,0},
-					       {32,32,32,32,8,8}, //0001
-					       {64,48,40,48,16,16}, //0010
-					       {96,56,48,56,24,24}, //0011
-					       {128,64,56,64,32,32}, //0100
-					       {160,80,64,80,40,40}, //0101
-					       {192,96,80,96,48,48}, //0110
-					       {224,112,96,112,56,56}, //0111
-					       {256,128,112,128,64,64}, //1000
-					       {288,160,128,144,80,80}, //1001
-					       {320,192,160,160,96,69}, //1010
-					       {352,224,192,176,112,112}, //1011
-					       {384,256,224,192,128,128}, //1100
-					       {416,320,256,224,144,144} };//1101
+uint16_t bitrate_table[14][6] PROGMEM = { 
+	{0,0,0,0,0,0},
+	{32,32,32,32,8,8}, //0001
+	{64,48,40,48,16,16}, //0010
+	{96,56,48,56,24,24}, //0011
+	{128,64,56,64,32,32}, //0100
+	{160,80,64,80,40,40}, //0101
+	{192,96,80,96,48,48}, //0110
+	{224,112,96,112,56,56}, //0111
+	{256,128,112,128,64,64}, //1000
+	{288,160,128,144,80,80}, //1001
+	{320,192,160,160,96,69}, //1010
+	{352,224,192,176,112,112}, //1011
+	{384,256,224,192,128,128}, //1100
+	{416,320,256,224,144,144} };//1101
+
+const char _sampleRateTable[4][4] PROGMEM = {
+	11, 12, 8, 0,
+	11, 12, 8, 0,
+	22, 24, 16, 0,
+	44, 48, 32, 0
+};
 
 Sd2Card card;
 SdVolume volume;
@@ -195,7 +203,8 @@ uint8_t SFEMP3Shield::playMP3(char* fileName){
 	  
 	//gotta start feeding that hungry mp3 chip
 	refill();
-	  
+	getAudioInfo();
+	
 	//attach refill interrupt off DREQ line, pin 2
 	attachInterrupt(MP3_DREQINT, refill, RISING);
 	  
@@ -572,4 +581,88 @@ uint8_t SFEMP3Shield::VSLoadUserCode(char* fileName){
 	track.close(); //Close out this track
 //	playing=FALSE;
 	return 0;
+}
+
+void SFEMP3Shield::getAudioInfo()
+{
+    // volume calculation       
+    unsigned short hdat0 = Mp3ReadRegister(SCI_HDAT0);
+    unsigned short hdat1 = Mp3ReadRegister(SCI_HDAT1);
+//    Serial.println(hdat0, HEX);
+//    Serial.println(hdat1, HEX);
+     
+    //DEBUGOUT("VS1053b: Audio info\r\n");       
+     
+    AInfo.type = UNKNOWN;       
+     
+    if (hdat1 == 0x7665)
+    {
+        // audio is WAV
+        AInfo.type = WAV;
+    } 
+    else if (hdat1 == 0x4154 || hdat1 == 0x4144 || hdat1 == 0x4D34 )
+    {
+        // audio  is AAC
+        AInfo.type = AAC;
+    }
+    else if (hdat1 == 0x574D )
+    {
+        // audio  is WMA
+        AInfo.type = WMA;
+    }
+    else if (hdat1 == 0x4D54 )
+    {
+        // audio  is MIDI
+        AInfo.type = MIDI;
+    }
+    else if (hdat1 == 0x4F76 )
+    {
+        // audio  is OGG VORBIS
+        AInfo.type = OGG_VORBIS;
+    }
+    else if (hdat1 >= 0xFFE0 &&  hdat1 <= 0xFFFF)
+    {
+        // audio  is mp3
+        AInfo.type = MP3;
+         
+        //DEBUGOUT("VS1053b:   Audio is mp3\r\n");       
+        AInfo.ext.mp3.id =      (MP3_ID)((hdat1 >>  3) & 0x0003);
+        switch((hdat1 >>  1) & 0x0003)
+        {
+        case 3:
+            AInfo.ext.mp3.layer = 1;   
+            break;
+        case 2:
+            AInfo.ext.mp3.layer = 2;   
+            break;
+        case 1:
+            AInfo.ext.mp3.layer = 3;   
+            break;           
+        default:
+            AInfo.ext.mp3.layer = 0;
+            break;           
+        }       
+        AInfo.ext.mp3.protrectBit =    (hdat1 >>  0) & 0x0001;               
+         
+        char srate =    (hdat0 >> 10) & 0x0003;      
+        AInfo.ext.mp3.kSampleRate = pgm_read_word_near ( &(_sampleRateTable[AInfo.ext.mp3.id][srate]) );
+         
+        AInfo.ext.mp3.padBit =         (hdat0 >>  9) & 0x0001;
+        AInfo.ext.mp3.mode =(MP3_MODE)((hdat0 >>  6) & 0x0003);
+        AInfo.ext.mp3.extension =      (hdat0 >>  4) & 0x0003;
+        AInfo.ext.mp3.copyright =      (hdat0 >>  3) & 0x0001;
+        AInfo.ext.mp3.original =       (hdat0 >>  2) & 0x0001;
+        AInfo.ext.mp3.emphasis =       (hdat0 >>  0) & 0x0003;
+         
+        //DEBUGOUT("VS1053b:  ID: %i, Layer: %i, Samplerate: %i, Mode: %i\r\n", AInfo.ext.mp3.id, AInfo.ext.mp3.layer, AInfo.ext.mp3.kSampleRate, AInfo.ext.mp3.mode);       
+    }
+     
+    // read byteRate
+    unsigned short byteRate = Mp3ReadWRAM(para_byteRate);
+    AInfo.kBitRate = (byteRate * 8) / 1000;
+    //DEBUGOUT("VS1053b:  BitRate: %i kBit/s\r\n", AInfo.kBitRate);
+     
+    // decode time
+    AInfo.decodeTime = Mp3ReadRegister(SCI_DECODE_TIME);  
+    //DEBUGOUT("VS1053b:  Decodetime: %i s\r\n", AInfo.decodeTime);
 }
